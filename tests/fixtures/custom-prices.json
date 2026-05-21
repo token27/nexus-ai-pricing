@@ -1,0 +1,28 @@
+[
+    {
+        "model": "my-private-llm",
+        "input_per_million": 1.50,
+        "output_per_million": 5.00,
+        "cache_write_per_million": 1.875,
+        "cache_read_per_million": 0.15,
+        "cache_read_is_subset_of_input": false,
+        "currency": "USD",
+        "notes": "Internal deployment"
+    },
+    {
+        "model": "my-fast-llm",
+        "input_per_million": 0.10,
+        "output_per_million": 0.30,
+        "currency": "USD",
+        "notes": "Optimized for batch"
+    },
+    {
+        "model": "enterprise-model-*",
+        "input_per_million": 2.00,
+        "output_per_million": 8.00,
+        "cache_read_per_million": 0.50,
+        "cache_read_is_subset_of_input": true,
+        "currency": "USD",
+        "notes": "Glob pattern for all enterprise variants"
+    }
+]
