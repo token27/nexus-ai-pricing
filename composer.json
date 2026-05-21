@@ -40,12 +40,12 @@
   },
   "autoload": {
     "psr-4": {
-      "Token27\\Pricing\\": "src/"
+      "Token27\\NexusAI\\Pricing\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "Token27\\Pricing\\Tests\\": "tests/"
+      "Token27\\NexusAI\\Pricing\\Tests\\": "tests/"
     }
   },
   "scripts": {
