@@ -78,6 +78,8 @@ final readonly class ModelPrice
          * When null, image tokens are billed at the standard inputPerMillion rate.
          */
         public ?float  $imageInputPerMillion = null,
+        public ?float  $imageOutputPerMillion = null,
+        public ?float  $perImageCost = null,
 
         /** ISO 4217 currency code. Always 'USD' in the built-in catalog. */
         public string  $currency = 'USD',
@@ -116,6 +118,16 @@ final readonly class ModelPrice
         return $this->imageInputPerMillion ?? $this->inputPerMillion;
     }
 
+    public function supportsImageGeneration(): bool
+    {
+        return $this->imageOutputPerMillion !== null || $this->perImageCost !== null;
+    }
+
+    public function effectiveImageOutputPrice(): float
+    {
+        return $this->imageOutputPerMillion ?? $this->outputPerMillion;
+    }
+
     /**
      * Return a copy with a different model identifier (useful for registering glob patterns).
      */
@@ -129,6 +141,8 @@ final readonly class ModelPrice
             cacheReadPerMillion: $this->cacheReadPerMillion,
             cacheReadIsSubsetOfInput: $this->cacheReadIsSubsetOfInput,
             imageInputPerMillion: $this->imageInputPerMillion,
+            imageOutputPerMillion: $this->imageOutputPerMillion,
+            perImageCost: $this->perImageCost,
             currency: $this->currency,
             notes: $this->notes,
         );

@@ -30,20 +30,23 @@ final readonly class PricingResult implements PricingResultInterface
 {
     public function __construct(
         private string $model,
-        private float  $inputCostUsd,
-        private float  $outputCostUsd,
-        private float  $cacheWriteCostUsd,
-        private float  $cacheReadCostUsd,
-        private float  $cacheSavingsUsd,
-        private int    $inputTokens,
-        private int    $outputTokens,
-        private int    $cacheWriteTokens,
-        private int    $cacheReadTokens,
+        private float $inputCostUsd,
+        private float $outputCostUsd,
+        private float $cacheWriteCostUsd,
+        private float $cacheReadCostUsd,
+        private float $cacheSavingsUsd,
+        private int $inputTokens,
+        private int $outputTokens,
+        private int $cacheWriteTokens,
+        private int $cacheReadTokens,
         private string $currency,
-        private bool   $isUnknownModel,
+        private bool $isUnknownModel,
+        private float $imageOutputCostUsd = 0.0,
+        private int $imageOutputTokens = 0,
+        private int $imageCount = 0,
     ) {}
 
-    // ─── Static Factories ─────────────────────────────────────────────────────
+    // --- Static Factories -----------------------------------------------------
 
     /**
      * Build from pre-computed cost components.
@@ -59,30 +62,30 @@ final readonly class PricingResult implements PricingResultInterface
      */
     public static function compute(
         ModelPrice $price,
-        int        $inputTokens,
-        int        $outputTokens,
-        int        $cacheWriteTokens = 0,
-        int        $cacheReadTokens  = 0,
-        bool       $unknownModel     = false,
+        int $inputTokens,
+        int $outputTokens,
+        int $cacheWriteTokens = 0,
+        int $cacheReadTokens = 0,
+        bool $unknownModel = false,
     ): self {
         $M = 1_000_000.0;
 
-        $inputCost  = ($inputTokens / $M) * $price->inputPerMillion;
+        $inputCost = ($inputTokens / $M) * $price->inputPerMillion;
         $outputCost = ($outputTokens / $M) * $price->outputPerMillion;
 
         // Cache-read adjustment: for OpenAI-style caching (subset), subtract from inputCost
         // and replace with cached rate. For Anthropic-style (additive), add separately.
-        $cacheWriteCost  = 0.0;
-        $cacheReadCost   = 0.0;
-        $cacheSavings    = 0.0;
+        $cacheWriteCost = 0.0;
+        $cacheReadCost = 0.0;
+        $cacheSavings = 0.0;
 
         if ($cacheReadTokens > 0 && $price->cacheReadPerMillion !== null) {
             $cacheReadCost = ($cacheReadTokens / $M) * $price->cacheReadPerMillion;
 
             if ($price->cacheReadIsSubsetOfInput) {
                 // Undo the inputPerMillion cost for cached tokens and apply discounted rate
-                $inputCost    -= ($cacheReadTokens / $M) * $price->inputPerMillion;
-                $cacheSavings  = ($cacheReadTokens / $M) * ($price->inputPerMillion - $price->cacheReadPerMillion);
+                $inputCost -= ($cacheReadTokens / $M) * $price->inputPerMillion;
+                $cacheSavings = ($cacheReadTokens / $M) * ($price->inputPerMillion - $price->cacheReadPerMillion);
             } else {
                 // Anthropic: cache read tokens are additional, savings = what they would have cost
                 $cacheSavings = ($cacheReadTokens / $M) * ($price->inputPerMillion - $price->cacheReadPerMillion);
@@ -128,7 +131,7 @@ final readonly class PricingResult implements PricingResultInterface
         );
     }
 
-    // ─── PricingResultInterface ───────────────────────────────────────────────
+    // --- PricingResultInterface ----------------------------------------------
 
     public function inputCostUsd(): float
     {
@@ -178,11 +181,24 @@ final readonly class PricingResult implements PricingResultInterface
     {
         return $this->model;
     }
+    public function imageOutputCostUsd(): float
+    {
+        return $this->imageOutputCostUsd;
+    }
+    public function imageOutputTokens(): int
+    {
+        return $this->imageOutputTokens;
+    }
+    public function imageCount(): int
+    {
+        return $this->imageCount;
+    }
 
     public function totalCostUsd(): float
     {
         return $this->inputCostUsd + $this->outputCostUsd
-             + $this->cacheWriteCostUsd + $this->cacheReadCostUsd;
+             + $this->cacheWriteCostUsd + $this->cacheReadCostUsd
+             + $this->imageOutputCostUsd;
     }
 
     public function isZero(): bool
@@ -192,13 +208,19 @@ final readonly class PricingResult implements PricingResultInterface
 
     public function format(): string
     {
-        $total  = number_format($this->totalCostUsd(), 6);
-        $input  = number_format($this->inputTokens);
+        $total = number_format($this->totalCostUsd(), 6);
+        $input = number_format($this->inputTokens);
         $output = number_format($this->outputTokens);
 
         $suffix = '';
+        if ($this->imageOutputTokens > 0) {
+            $suffix .= ' + ' . number_format($this->imageOutputTokens) . ' image output tokens';
+        }
+        if ($this->imageCount > 0) {
+            $suffix .= ' (' . number_format($this->imageCount) . ' images)';
+        }
         if ($this->isUnknownModel) {
-            $suffix = ' [unknown model — price unavailable]';
+            $suffix .= ' [unknown model]';
         }
 
         return "\${$total} {$this->currency} ({$input} input + {$output} output tokens){$suffix}";
@@ -207,11 +229,19 @@ final readonly class PricingResult implements PricingResultInterface
     public function formatDetailed(): string
     {
         $lines = [
-            sprintf('Model:        %s%s', $this->model, $this->isUnknownModel ? ' (UNKNOWN — prices unavailable)' : ''),
+            sprintf('Model:        %s%s', $this->model, $this->isUnknownModel ? ' (UNKNOWN - prices unavailable)' : ''),
             sprintf('Total:        $%s %s', number_format($this->totalCostUsd(), 6), $this->currency),
             sprintf('  Input:      $%s (%s tokens)', number_format($this->inputCostUsd, 6), number_format($this->inputTokens)),
             sprintf('  Output:     $%s (%s tokens)', number_format($this->outputCostUsd, 6), number_format($this->outputTokens)),
         ];
+
+        if ($this->imageOutputTokens > 0) {
+            $lines[] = sprintf(
+                '  Image output: $%s (%s tokens)',
+                number_format($this->imageOutputCostUsd, 6),
+                number_format($this->imageOutputTokens),
+            );
+        }
 
         if ($this->cacheWriteTokens > 0 || $this->cacheReadTokens > 0) {
             $lines[] = sprintf('  Cache write: $%s (%s tokens)', number_format($this->cacheWriteCostUsd, 6), number_format($this->cacheWriteTokens));
@@ -229,37 +259,47 @@ final readonly class PricingResult implements PricingResultInterface
     public function toArray(): array
     {
         return [
-            'model'                => $this->model,
-            'currency'             => $this->currency,
-            'input_tokens'         => $this->inputTokens,
-            'output_tokens'        => $this->outputTokens,
-            'cache_write_tokens'   => $this->cacheWriteTokens,
-            'cache_read_tokens'    => $this->cacheReadTokens,
-            'input_cost_usd'       => $this->inputCostUsd,
-            'output_cost_usd'      => $this->outputCostUsd,
-            'cache_write_cost_usd' => $this->cacheWriteCostUsd,
-            'cache_read_cost_usd'  => $this->cacheReadCostUsd,
-            'cache_savings_usd'    => $this->cacheSavingsUsd,
-            'total_cost_usd'       => $this->totalCostUsd(),
-            'is_unknown_model'     => $this->isUnknownModel,
+            'model'                 => $this->model,
+            'currency'              => $this->currency,
+            'input_tokens'          => $this->inputTokens,
+            'output_tokens'         => $this->outputTokens,
+            'cache_write_tokens'    => $this->cacheWriteTokens,
+            'cache_read_tokens'     => $this->cacheReadTokens,
+            'input_cost_usd'        => $this->inputCostUsd,
+            'output_cost_usd'       => $this->outputCostUsd,
+            'cache_write_cost_usd'  => $this->cacheWriteCostUsd,
+            'cache_read_cost_usd'   => $this->cacheReadCostUsd,
+            'cache_savings_usd'     => $this->cacheSavingsUsd,
+            'image_output_cost_usd' => $this->imageOutputCostUsd,
+            'image_output_tokens'   => $this->imageOutputTokens,
+            'image_count'           => $this->imageCount,
+            'total_cost_usd'        => $this->totalCostUsd(),
+            'is_unknown_model'      => $this->isUnknownModel,
         ];
     }
 
     public function add(PricingResultInterface $other): static
     {
+        $otherImageOutputCostUsd = $other instanceof self ? $other->imageOutputCostUsd : 0.0;
+        $otherImageOutputTokens = $other instanceof self ? $other->imageOutputTokens : 0;
+        $otherImageCount = $other instanceof self ? $other->imageCount : 0;
+
         return new self(
             model: $this->model,
-            inputCostUsd: $this->inputCostUsd      + $other->inputCostUsd(),
-            outputCostUsd: $this->outputCostUsd     + $other->outputCostUsd(),
+            inputCostUsd: $this->inputCostUsd + $other->inputCostUsd(),
+            outputCostUsd: $this->outputCostUsd + $other->outputCostUsd(),
             cacheWriteCostUsd: $this->cacheWriteCostUsd + $other->cacheWriteCostUsd(),
-            cacheReadCostUsd: $this->cacheReadCostUsd  + $other->cacheReadCostUsd(),
-            cacheSavingsUsd: $this->cacheSavingsUsd   + $other->cacheSavingsUsd(),
-            inputTokens: $this->inputTokens       + $other->inputTokens(),
-            outputTokens: $this->outputTokens      + $other->outputTokens(),
-            cacheWriteTokens: $this->cacheWriteTokens  + $other->cacheWriteTokens(),
-            cacheReadTokens: $this->cacheReadTokens   + $other->cacheReadTokens(),
+            cacheReadCostUsd: $this->cacheReadCostUsd + $other->cacheReadCostUsd(),
+            cacheSavingsUsd: $this->cacheSavingsUsd + $other->cacheSavingsUsd(),
+            inputTokens: $this->inputTokens + $other->inputTokens(),
+            outputTokens: $this->outputTokens + $other->outputTokens(),
+            cacheWriteTokens: $this->cacheWriteTokens + $other->cacheWriteTokens(),
+            cacheReadTokens: $this->cacheReadTokens + $other->cacheReadTokens(),
             currency: $this->currency,
             isUnknownModel: $this->isUnknownModel && $other->isUnknownModel(),
+            imageOutputCostUsd: $this->imageOutputCostUsd + $otherImageOutputCostUsd,
+            imageOutputTokens: $this->imageOutputTokens + $otherImageOutputTokens,
+            imageCount: $this->imageCount + $otherImageCount,
         );
     }
 }

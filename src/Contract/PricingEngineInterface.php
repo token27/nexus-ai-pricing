@@ -75,6 +75,23 @@ interface PricingEngineInterface
     ): PricingResultInterface;
 
     /**
+     * Calcula el coste desde un UsageInterface con breakdown completo.
+     *
+     * Aplica el precio correcto a cada tipo de token:
+     *   - textInput  -> inputPerMillion
+     *   - imageInput -> imageInputPerMillion (o inputPerMillion si no definido)
+     *   - textOutput -> outputPerMillion
+     *   - imageOutput -> imageOutputPerMillion (o outputPerMillion si no definido)
+     *   - cache -> cacheWritePerMillion / cacheReadPerMillion
+     *
+     * Este es el metodo canonico para integracion con nexus-ai.
+     */
+    public function calculateFromUsage(
+        UsageInterface $usage,
+        string $model,
+    ): PricingResultInterface;
+
+    /**
      * Estimate cost including multimodal image tokens (pre-request).
      *
      * Text tokens use the injected TokenizerInterface.

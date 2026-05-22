@@ -181,11 +181,20 @@ final class PricingResultTest extends TestCase
                 $price->inputPerMillion,
                 "Model '{$price->model}' has zero inputPerMillion — update DefaultPriceCatalog!",
             );
-            static::assertGreaterThan(
-                0.0,
-                $price->outputPerMillion,
-                "Model '{$price->model}' has zero outputPerMillion — update DefaultPriceCatalog!",
-            );
+            if ($price->supportsImageGeneration()) {
+                static::assertTrue(
+                    $price->outputPerMillion > 0.0
+                    || $price->imageOutputPerMillion !== null
+                    || $price->perImageCost !== null,
+                    "Image model '{$price->model}' must define outputPerMillion or image generation pricing fields.",
+                );
+            } else {
+                static::assertGreaterThan(
+                    0.0,
+                    $price->outputPerMillion,
+                    "Model '{$price->model}' has zero outputPerMillion � update DefaultPriceCatalog!",
+                );
+            }
         }
     }
 }

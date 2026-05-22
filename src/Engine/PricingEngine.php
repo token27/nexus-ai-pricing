@@ -10,6 +10,7 @@ use Token27\NexusAI\Pricing\Contract\PriceTableInterface;
 use Token27\NexusAI\Pricing\Contract\PricingEngineInterface;
 use Token27\NexusAI\Pricing\Contract\PricingResultInterface;
 use Token27\NexusAI\Pricing\Contract\TextEstimatorInterface;
+use Token27\NexusAI\Pricing\Contract\UsageInterface;
 use Token27\NexusAI\Pricing\Exception\EstimationNotAvailableException;
 use Token27\NexusAI\Pricing\PriceTable\ArrayPriceTable;
 use Token27\NexusAI\Pricing\Registry\PricingRegistry;
@@ -257,6 +258,65 @@ final class PricingEngine implements PricingEngineInterface
             cacheWriteTokens: $cacheWriteTokens ?? 0,
             cacheReadTokens: $cacheReadTokens ?? 0,
             unknownModel: !$this->priceTable->hasPrice($model),
+        );
+    }
+
+    public function calculateFromUsage(UsageInterface $usage, string $model): PricingResultInterface
+    {
+        $price = $this->priceTable->getPrice($model);
+
+        // Texto input
+        $textInputCost = ($usage->textInputTokens() / 1_000_000) * $price->inputPerMillion;
+
+        // Imagen input (vision)
+        $imageInputCost = 0.0;
+        if ($usage->imageInputTokens() > 0) {
+            $rate = $price->imageInputPerMillion ?? $price->inputPerMillion;
+            $imageInputCost = ($usage->imageInputTokens() / 1_000_000) * $rate;
+        }
+
+        // Texto output
+        $textOutputCost = ($usage->textOutputTokens() / 1_000_000) * $price->outputPerMillion;
+
+        // Imagen output (generation) — NUEVO
+        $imageOutputCost = 0.0;
+        if ($usage->imageOutputTokens() > 0) {
+            $rate = $price->imageOutputPerMillion ?? $price->outputPerMillion;
+            $imageOutputCost = ($usage->imageOutputTokens() / 1_000_000) * $rate;
+        }
+
+        // Cache (sin cambios)
+        $cacheWriteCost = 0.0;
+        $cacheReadCost = 0.0;
+        $cacheSavings = 0.0;
+
+        if ($usage->cacheWriteTokens() > 0 && $price->cacheWritePerMillion !== null) {
+            $cacheWriteCost = ($usage->cacheWriteTokens() / 1_000_000) * $price->cacheWritePerMillion;
+        }
+        if ($usage->cacheReadTokens() > 0 && $price->cacheReadPerMillion !== null) {
+            $cacheReadCost = ($usage->cacheReadTokens() / 1_000_000) * $price->cacheReadPerMillion;
+            if ($price->cacheReadIsSubsetOfInput) {
+                $cacheSavings = ($usage->cacheReadTokens() / 1_000_000)
+                    * ($price->inputPerMillion - $price->cacheReadPerMillion);
+            }
+        }
+
+        return new PricingResult(
+            model: $model,
+            inputCostUsd: $textInputCost + $imageInputCost,
+            outputCostUsd: $textOutputCost,
+            cacheWriteCostUsd: $cacheWriteCost,
+            cacheReadCostUsd: $cacheReadCost,
+            cacheSavingsUsd: $cacheSavings,
+            inputTokens: $usage->totalInputTokens(),
+            outputTokens: $usage->totalOutputTokens(),
+            cacheWriteTokens: $usage->cacheWriteTokens() ?? 0,
+            cacheReadTokens: $usage->cacheReadTokens() ?? 0,
+            currency: $price->currency,
+            isUnknownModel: false,
+            imageOutputCostUsd: $imageOutputCost,
+            imageOutputTokens: $usage->imageOutputTokens(),
+            imageCount: 0,
         );
     }
 

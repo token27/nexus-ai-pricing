@@ -45,6 +45,7 @@ final class DefaultPriceCatalog
             ...self::groq(),
             ...self::mistral(),
             ...self::perplexity(),
+            ...self::imageGeneration(),
         ];
     }
 
@@ -716,6 +717,103 @@ final class DefaultPriceCatalog
                 inputPerMillion: 2.00,
                 outputPerMillion: 8.00,
                 notes: $src . ' — Also charges citation tokens ($2/M) and search ($5/1K queries).',
+            ),
+        ];
+    }
+
+    /** @return list<ModelPrice> */
+    private static function imageGeneration(): array
+    {
+        $src = 'Source: openai.com/api/pricing + docs.x.ai + ai.google.dev | Verified: 2026-05-22';
+
+        return [
+            // —— OpenAI image generation ——————————————————————————————————
+            new ModelPrice(
+                'gpt-image-1',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                notes: $src,
+            ),
+            new ModelPrice(
+                'gpt-image-1-mini',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                notes: $src,
+            ),
+            new ModelPrice(
+                'gpt-image-2',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                notes: $src,
+            ),
+            new ModelPrice(
+                'gpt-image-2-2026-04-21',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                notes: $src,
+            ),
+            new ModelPrice(
+                'chatgpt-image-latest',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                notes: $src,
+            ),
+
+            // —— xAI Grok (per-image → tokens sintéticos) ——————————————————
+            new ModelPrice(
+                'grok-imagine-image-quality',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                perImageCost: 0.05,
+                notes: $src . ' — $0.05/1k, $0.10/2k. Modelado como tokens sintéticos.',
+            ),
+            new ModelPrice(
+                'grok-imagine-image-quality-latest',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                perImageCost: 0.05,
+                notes: $src,
+            ),
+            new ModelPrice(
+                'grok-imagine-image-pro',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                perImageCost: 0.05,
+                notes: $src . ' — DEPRECATED May 2026.',
+            ),
+
+            // —— Google Gemini image generation ———————————————————————————
+            new ModelPrice(
+                'gemini-2.5-flash-image',
+                inputPerMillion: 0.30,
+                outputPerMillion: 0.60,
+                imageOutputPerMillion: 0.60,
+                notes: $src . ' — 4K image ≈ 2,520 tokens ≈ $0.151.',
+            ),
+
+            // —— Glob patterns para variantes futuras ——————————————————————
+            new ModelPrice(
+                'gpt-image-*',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                notes: $src,
+            ),
+            new ModelPrice(
+                'grok-imagine-*',
+                inputPerMillion: 5.00,
+                outputPerMillion: 0.0,
+                imageOutputPerMillion: 40.00,
+                perImageCost: 0.05,
+                notes: $src,
             ),
         ];
     }

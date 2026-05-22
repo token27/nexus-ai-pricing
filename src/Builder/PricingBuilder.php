@@ -6,6 +6,7 @@ namespace Token27\NexusAI\Pricing\Builder;
 
 use Token27\NexusAI\Pricing\Contract\PricingEngineInterface;
 use Token27\NexusAI\Pricing\Contract\PricingResultInterface;
+use Token27\NexusAI\Pricing\Contract\UsageInterface;
 use Token27\NexusAI\Pricing\ValueObject\ImageAttachment;
 use Token27\NexusAI\Pricing\ValueObject\MultimodalPricingResult;
 
@@ -95,6 +96,15 @@ final class PricingBuilder
     public function estimateWithImages(string $text, array $images): MultimodalPricingResult
     {
         return $this->engine->estimateWithImages($text, $this->model, $images);
+    }
+
+    /**
+     * Calcula el coste desde un UsageInterface con breakdown completo (post-request).
+     * Metodo canonico para integracion con nexus-ai.
+     */
+    public function calculateFromUsage(UsageInterface $usage): PricingResultInterface
+    {
+        return $this->engine->calculateFromUsage($usage, $this->model);
     }
 
     /** Return the model this builder is bound to. */

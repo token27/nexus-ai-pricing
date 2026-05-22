@@ -15,6 +15,7 @@ use Token27\NexusAI\Pricing\PriceTable\NullPriceTable;
 use Token27\NexusAI\Pricing\ValueObject\ImageAttachment;
 use Token27\NexusAI\Pricing\ValueObject\ModelPrice;
 use Token27\NexusAI\Pricing\ValueObject\MultimodalPricingResult;
+use Token27\NexusAI\Pricing\ValueObject\Usage;
 
 /**
  * Unit tests for PricingEngine.
@@ -113,6 +114,25 @@ final class PricingEngineTest extends TestCase
         static::assertEqualsWithDelta(0.000028, $result->inputCostUsd(), 1e-9);
         static::assertEqualsWithDelta(0.00000224, $result->cacheReadCostUsd(), 1e-11);
         static::assertEqualsWithDelta(0.000028, $result->outputCostUsd(), 1e-9);
+    }
+
+    public function testCalculateFromUsageWithImageOutputUsesImageRateWithoutDoubleCounting(): void
+    {
+        $price = new ModelPrice(
+            model: 'gpt-image-1',
+            inputPerMillion: 5.00,
+            outputPerMillion: 0.0,
+            imageOutputPerMillion: 40.00,
+        );
+        $engine = new PricingEngine(priceTable: new ArrayPriceTable([$price]));
+
+        $usage = new Usage(textInputTokens: 31, imageOutputTokens: 4_160);
+        $result = $engine->calculateFromUsage($usage, 'gpt-image-1');
+
+        static::assertEqualsWithDelta(0.1664, $result->imageOutputCostUsd(), 1e-10);
+        static::assertEqualsWithDelta(0.166555, $result->totalCostUsd(), 1e-10);
+        static::assertSame(4_160, $result->imageOutputTokens());
+        static::assertStringContainsString('4,160 image output tokens', $result->format());
     }
 
     // ─── estimate() — requires TextEstimatorInterface ─────────────────────────
